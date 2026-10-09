@@ -64,7 +64,16 @@ static tw_load_status fail(tw_loaded *im, tw_load_status st, const char *fmt, ..
     va_list ap;
     im->status = st;
     va_start(ap, fmt);
+    /* fail() is printf-format checked at its call sites. Clang's fortified
+     * vsnprintf wrapper does not propagate that guarantee to fmt here. */
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#endif
     vsnprintf(im->err, sizeof(im->err), fmt, ap);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
     va_end(ap);
     return st;
 }
