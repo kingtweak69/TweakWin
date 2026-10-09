@@ -57,6 +57,7 @@ const char *tw_load_status_name(tw_load_status st)
 }
 
 static tw_load_status fail(tw_loaded *im, tw_load_status st, const char *fmt, ...)
+    __attribute__((format(printf, 3, 4)));
 {
     va_list ap;
     im->status = st;
