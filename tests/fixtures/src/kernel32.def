@@ -1,0 +1,24 @@
+LIBRARY kernel32.dll
+EXPORTS
+GetStdHandle
+WriteFile
+ExitProcess
+CreateThread
+WaitForSingleObject
+WaitForMultipleObjects
+GetExitCodeThread
+CreateEventA
+SetEvent
+ResetEvent
+CreateSemaphoreA
+ReleaseSemaphore
+CloseHandle
+TlsAlloc
+TlsFree
+TlsGetValue
+TlsSetValue
+GetCurrentThreadId
+GetLastError
+AddVectoredExceptionHandler
+RemoveVectoredExceptionHandler
+SetUnhandledExceptionFilter

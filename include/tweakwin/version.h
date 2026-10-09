@@ -1,0 +1,10 @@
+#ifndef TWEAKWIN_VERSION_H
+#define TWEAKWIN_VERSION_H
+
+#define TWEAKWIN_VERSION_MAJOR 0
+#define TWEAKWIN_VERSION_MINOR 3
+#define TWEAKWIN_VERSION_PATCH 0
+#define TWEAKWIN_VERSION_STRING "0.3.0-m3"
+#define TWEAKWIN_MILESTONE "M3 (process runtime over TweakKernel backend)"
+
+#endif

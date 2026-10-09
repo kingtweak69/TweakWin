@@ -1,0 +1,52 @@
+TweakWin PE Inspector
+File: <path>
+Architecture: x86_64
+Format: PE32+
+Type: DLL
+Subsystem: Windows GUI
+Image base: 0x180000000
+Entry point: 0x180001000 (RVA 0x1000)
+Image size: 0x7000
+Headers size: 0x400
+Alignment: section 0x1000, file 0x200
+Linker: 14.38
+OS version: 6.0, subsystem version: 6.0
+Stack: reserve 0x100000, commit 0x1000
+Heap: reserve 0x100000, commit 0x1000
+File characteristics: EXECUTABLE_IMAGE LARGE_ADDRESS_AWARE DLL
+DLL characteristics: HIGH_ENTROPY_VA DYNAMIC_BASE NX_COMPAT
+Sections:
+  .text      R-X  VA 0x00001000  vsize 0x00000040  raw 0x00000400+0x00000200
+  .rdata     R--  VA 0x00002000  vsize 0x000001dc  raw 0x00000600+0x00000200
+  .data      RW-  VA 0x00003000  vsize 0x00000020  raw 0x00000800+0x00000200
+  .tls       RW-  VA 0x00004000  vsize 0x00000010  raw 0x00000a00+0x00000200
+  .rsrc      R--  VA 0x00005000  vsize 0x00000108  raw 0x00000c00+0x00000200
+  .reloc     R--  VA 0x00006000  vsize 0x00000014  raw 0x00000e00+0x00000200
+Data directories:
+  EXPORT        RVA 0x000020a8  size 0x83
+  IMPORT        RVA 0x00002000  size 0x3c
+  RESOURCE      RVA 0x00005000  size 0x108
+  BASERELOC     RVA 0x00006000  size 0x14
+  TLS           RVA 0x00002148  size 0x28
+  IAT           RVA 0x00002050  size 0x30
+  DELAY_IMPORT  RVA 0x0000219c  size 0x40
+Imports:
+  KERNEL32.dll
+    GetTickCount
+  WS2_32.dll
+    #115
+Delay imports:
+  USER32.dll
+    MessageBoxW
+Exports: tweaktest.dll (4 entries, ordinal base 1)
+  #1     Alpha @ RVA 0x1000
+  #2     Beta @ RVA 0x1010
+  #4     (by ordinal) @ RVA 0x1020
+  #5     Gamma -> KERNEL32.GetTickCount
+Relocations: 1 block, 6 entries (DIR64 6)
+TLS: data 0x180004000-0x180004010, zero-fill 0x10, index @ 0x180003000, 2 callbacks
+  callback 0x180001020
+  callback 0x180001030
+Resources: 2 types, 2 entries
+  "TWEAK": 1
+  VERSION: 1
