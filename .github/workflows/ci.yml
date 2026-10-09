@@ -1,0 +1,51 @@
+name: TweakWin CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tweakwin-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+          - compiler: clang
+            cc: clang
+    env:
+      CC: ${{ matrix.cc }}
+      PYTHON: python3
+      ASAN_OPTIONS: detect_leaks=0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang make python3 python3-pip
+          python3 -m pip install --user --break-system-packages pefile ziglang
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: make -j2
+      - name: Run unit, integration, sanitizer, mutation and install checks
+        run: make test
+      - name: Upload executable
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tweakwin-linux-${{ matrix.compiler }}
+          path: build/tweakwin
+          if-no-files-found: error
