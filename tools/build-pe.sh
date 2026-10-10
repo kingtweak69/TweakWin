@@ -101,4 +101,4 @@ exe m4-reg m4_reg.c "$out/advapi32.lib"
 exe m4-probe m4_probe.c
 rm -f "$out"/*.obj
 
-echo "build-pe: wrote M3 acceptance PEs to $out"
+echo "build-pe: wrote M3 + M4 acceptance PEs to $out"
