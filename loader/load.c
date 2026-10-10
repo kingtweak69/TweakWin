@@ -4,6 +4,7 @@
 #include "../common/debug.h"
 #include "../runtime/modules.h"
 #include "../runtime/vmem.h"
+#include "../runtime/winfs.h"
 #include "../rt/rt.h"
 #include "../backend/kb.h"
 
@@ -169,6 +170,7 @@ static int range_ok(const tw_loaded *im, uint64_t addr, uint64_t len, int need)
         if (addr >= r->start && end <= r->end && (r->prot & need) == need)
             return 1;
     }
+    if (tw_modules_guest_check(addr, len, need)) return 1;
     if (tw_vmem_check(addr, len, need)) return 1;
     /* rt/ allocations (TEB, PEB, process parameters, TLS blocks, thread
      * stacks) live in the backend VM. Accept any span that is committed
@@ -202,6 +204,39 @@ static tw_load_status check_runnable(tw_loaded *im)
         return fail(im, TW_LOAD_ERR_ENTRY, "entry point RVA 0x%x is not inside a section", pe->entry_rva);
     if (!(pe->sections[si].characteristics & TW_PE_SCN_MEM_EXECUTE))
         return fail(im, TW_LOAD_ERR_ENTRY, "entry point is not in an executable section");
+    return TW_LOAD_OK;
+}
+
+static tw_load_status check_dll(tw_loaded *im)
+{
+    const tw_pe_image *pe = &im->pe;
+    if (!tw_pe_is_dll(pe))
+        return fail(im, TW_LOAD_ERR_UNSUPPORTED, "image is not a DLL");
+    if (pe->tls.present)
+        return fail(im, TW_LOAD_ERR_UNSUPPORTED, "DLL implicit TLS (.tls) is not supported");
+    /* Section file data must not alias the headers or another section: a
+     * DLL is run, so an image whose imports and code are read from the same
+     * bytes is refused rather than executed. */
+    for (uint16_t i = 0; i < pe->nsections; i++) {
+        const tw_pe_section *a = &pe->sections[i];
+        if (!a->raw_size) continue;
+        if (a->raw_ptr < pe->size_of_headers)
+            return fail(im, TW_LOAD_ERR_MALFORMED, "section %u raw data overlaps the headers", (unsigned)i);
+        for (uint16_t k = (uint16_t)(i + 1); k < pe->nsections; k++) {
+            const tw_pe_section *b = &pe->sections[k];
+            if (!b->raw_size) continue;
+            if ((uint64_t)a->raw_ptr < (uint64_t)b->raw_ptr + b->raw_size &&
+                (uint64_t)b->raw_ptr < (uint64_t)a->raw_ptr + a->raw_size)
+                return fail(im, TW_LOAD_ERR_MALFORMED, "sections %u and %u have overlapping raw data",
+                            (unsigned)i, (unsigned)k);
+        }
+    }
+    if (pe->entry_rva) {
+        int si = tw_pe_section_for_rva(pe, pe->entry_rva);
+        if (si < 0 || !(pe->sections[si].characteristics & TW_PE_SCN_MEM_EXECUTE))
+            return fail(im, TW_LOAD_ERR_ENTRY, "DLL entry point RVA 0x%x is not in an executable section",
+                        pe->entry_rva);
+    }
     return TW_LOAD_OK;
 }
 
@@ -380,8 +415,11 @@ static tw_load_status patch_imports(tw_loaded *im)
             TW_DEBUG(TW_DBG_IMPORTS, "skipping delay-load DLL %s", d->dll);
             continue;
         }
-        if (!tw_modules_find(d->dll))
-            return fail(im, TW_LOAD_ERR_UNRESOLVED_DLL, "unknown DLL '%s'", d->dll ? d->dll : "(null)");
+        {
+            char why[192];
+            tw_load_status rs = tw_modules_require(im, d->dll, why, sizeof why);
+            if (rs != TW_LOAD_OK) return fail(im, rs, "%s", why);
+        }
 
         for (size_t j = 0; j < d->nfns; j++) {
             const tw_pe_import_fn *fn = &d->fns[j];
@@ -389,6 +427,7 @@ static tw_load_status patch_imports(tw_loaded *im)
             uint64_t addr = tw_modules_resolve(d->dll, fn->name, fn->ordinal, fn->by_ordinal, why, sizeof(why));
             if (!addr)
                 return fail(im, TW_LOAD_ERR_UNRESOLVED_SYMBOL, "%s", why);
+
             uint32_t slot = fn->iat_rva;
             if (!slot || (uint64_t)slot + 8 > pe->size_of_image)
                 return fail(im, TW_LOAD_ERR_MALFORMED, "IAT slot for %s is outside the image",
@@ -493,11 +532,15 @@ static tw_load_status map_stack(tw_loaded *im)
     return TW_LOAD_OK;
 }
 
-tw_load_status tw_load(const char *path, int base_policy, tw_loaded *out, tw_pe_error *perr)
+static tw_load_status load_common(const char *path, int base_policy, tw_loaded *out,
+                                  tw_pe_error *perr, int dll)
 {
     tw_pe_error dummy;
     if (!perr) perr = &dummy;
+    void *owner = dll ? out->mod_owner : NULL;
     memset(out, 0, sizeof(*out));
+    out->mod_owner = owner;
+    out->is_dll = dll;
 
     tw_pe_status pst = tw_pe_load_file(path, &out->pe, perr);
     if (pst != TW_PE_OK) {
@@ -507,12 +550,17 @@ tw_load_status tw_load(const char *path, int base_policy, tw_loaded *out, tw_pe_
     }
 
     tw_load_status st;
-    if ((st = check_runnable(out)) != TW_LOAD_OK) return st;
+    if ((st = dll ? check_dll(out) : check_runnable(out)) != TW_LOAD_OK) return st;
     if ((st = map_image(out, base_policy)) != TW_LOAD_OK) return st;
     if ((st = copy_sections(out)) != TW_LOAD_OK) return st;
     if ((st = apply_relocs(out)) != TW_LOAD_OK) return st;
     if ((st = patch_imports(out)) != TW_LOAD_OK) return st;
     if ((st = protect_image(out)) != TW_LOAD_OK) return st;
+    if (dll) {
+        tw_kb_fault_region_add(out->base, out->image_size, 0);
+        out->status = TW_LOAD_OK;
+        return TW_LOAD_OK;
+    }
     if ((st = map_stack(out)) != TW_LOAD_OK) return st;
     /* Let the backend attribute faults in the image text and accept the
      * guest stack for exception records (no-op on TweakKernel M4). */
@@ -522,9 +570,22 @@ tw_load_status tw_load(const char *path, int base_policy, tw_loaded *out, tw_pe_
     return TW_LOAD_OK;
 }
 
+tw_load_status tw_load(const char *path, int base_policy, tw_loaded *out, tw_pe_error *perr)
+{
+    /* The application directory is the DLL search root for implicit imports. */
+    tw_winfs_default_root(path);
+    return load_common(path, base_policy, out, perr, 0);
+}
+
+tw_load_status tw_load_dll(const char *path, int base_policy, tw_loaded *out, tw_pe_error *perr)
+{
+    return load_common(path, base_policy, out, perr, 1);
+}
+
 void tw_unload(tw_loaded *im)
 {
     if (!im) return;
+    tw_modules_unload_all();
     tw_kb_fault_region_clear();
     if (g_current == im) g_current = NULL;
     if (im->stack_map && im->stack_map_len)
@@ -533,6 +594,17 @@ void tw_unload(tw_loaded *im)
         munmap(im->map_ptr, im->map_len);
     tw_pe_free(&im->pe);
     memset(im, 0, sizeof(*im));
+}
+
+void tw_unload_dll(tw_loaded *im)
+{
+    if (!im) return;
+    if (im->map_ptr && im->map_len)
+        munmap(im->map_ptr, im->map_len);
+    tw_pe_free(&im->pe);
+    void *owner = im->mod_owner;
+    memset(im, 0, sizeof(*im));
+    im->mod_owner = owner;
 }
 
 /* ------------------------------------------------------------------ */
@@ -592,6 +664,28 @@ static void asan_finish_on_guest(tw_loaded *im)
 #else
     (void)im;
 #endif
+}
+
+/* Runs on the guest stack in place of the entry point: implicitly imported
+ * DLLs get DllMain(PROCESS_ATTACH) there (dependencies first), so DllMain can
+ * use stack buffers exactly as it would under later LoadLibrary calls. */
+static uint64_t g_entry_va;
+
+__attribute__((noinline, used, noreturn, no_sanitize("address")))
+static void guest_start(void)
+{
+    tw_loaded *im = g_current;
+    if (tw_modules_attach_pending(im->err, sizeof im->err) != 0) {
+        im->did_exit = 0;
+        im->status = TW_LOAD_ERR_RUNTIME;
+        tw_guest_exit_longjmp(im);
+    }
+    uint64_t a = g_entry_va;
+    void (*fn)(void) __attribute__((ms_abi));
+    memcpy(&fn, &a, sizeof fn);
+    fn();
+    guest_returned();
+    __builtin_unreachable();
 }
 
 __attribute__((naked, noinline, noreturn))
@@ -681,11 +775,14 @@ tw_load_status tw_execute(tw_loaded *im, uint32_t *guest_exit)
          * TEB, so a callback that touches thread-local data is safe. */
         tw_rt_tls_run_callbacks(1 /* DLL_PROCESS_ATTACH */);
     }
-
 #if TW_ASAN
     __sanitizer_start_switch_fiber(&im->asan_fake_stack, im->stack, im->stack_len);
 #endif
-    jump_to_guest(entry_va, top, ret_fn, im);
+    g_entry_va = entry_va;
+    uint64_t start_fn = 0;
+    void (*sp)(void) = guest_start;
+    memcpy(&start_fn, &sp, sizeof sp);
+    jump_to_guest(start_fn, top, ret_fn, im);
 }
 
 #if defined(__GNUC__)

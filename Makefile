@@ -29,11 +29,12 @@ LIB_SRC := $(BACKEND_SRC) $(NT_SRC) $(RT_SRC) common/arena.c common/debug.c \
            loader/pe/pe.c loader/pe/pe_names.c \
            loader/load.c \
            runtime/modules.c runtime/vmem.c runtime/handle.c runtime/process.c \
-           runtime/gueststr.c runtime/utf.c \
+           runtime/gueststr.c runtime/utf.c runtime/winfs.c runtime/registry.c \
            kernel32/kernel32.c kernel32/k32_file.c kernel32/k32_mem.c kernel32/k32_proc.c \
-           kernel32/k32_sync.c kernel32/k32_thread.c kernel32/k32_tls.c kernel32/k32_exc.c
+           kernel32/k32_sync.c kernel32/k32_thread.c kernel32/k32_tls.c kernel32/k32_exc.c \
+           kernel32/k32_module.c kernel32/k32_fs.c advapi32/advapi32.c
 CLI_SRC := cli/main.c cli/inspect.c cli/run.c
-HDRS    := $(wildcard backend/*.h rt/*.h nt/*.h common/*.h loader/*.h loader/pe/*.h runtime/*.h kernel32/*.h cli/*.h include/tweakwin/*.h)
+HDRS    := $(wildcard backend/*.h rt/*.h nt/*.h common/*.h loader/*.h loader/pe/*.h runtime/*.h kernel32/*.h advapi32/*.h cli/*.h include/tweakwin/*.h)
 
 .PHONY: all test unit integration sweep fixtures fuzz hello install installcheck clean m4 kbcheck
 
@@ -69,6 +70,9 @@ $(B)/test_pe: tests/unit/test_pe.c $(LIB_SRC) $(HDRS) | $(B)
 $(B)/test_loader: tests/unit/test_loader.c $(LIB_SRC) $(HDRS) | $(B)
 	$(CC) -std=c11 -D_POSIX_C_SOURCE=200809L $(WARN) $(SANFLAGS) -o $@ tests/unit/test_loader.c $(LIB_SRC) -lpthread
 
+$(B)/test_m4ns: tests/unit/test_m4ns.c runtime/winfs.c runtime/registry.c runtime/utf.c $(HDRS) | $(B)
+	$(CC) -std=c11 -D_POSIX_C_SOURCE=200809L $(WARN) $(SANFLAGS) -o $@ tests/unit/test_m4ns.c runtime/winfs.c runtime/registry.c runtime/utf.c
+
 $(B)/test_nt: tests/unit/test_nt.c nt/status.c backend/kb.h nt/status.h nt/ntstatus.h | $(B)
 	$(CC) -std=c11 -D_POSIX_C_SOURCE=200809L $(WARN) $(SANFLAGS) -o $@ tests/unit/test_nt.c nt/status.c
 
@@ -92,7 +96,7 @@ fixtures: | $(B)
 	sh tools/build-hello.sh $(B)/fixtures
 	sh tools/build-pe.sh $(B)/fixtures
 
-unit: $(B)/test_kb kbcheck $(B)/test_nt $(B)/test_rt $(B)/test_seh $(B)/test_pe $(B)/test_loader $(B)/test_abi $(B)/test_runtime fixtures
+unit: $(B)/test_kb kbcheck $(B)/test_nt $(B)/test_rt $(B)/test_seh $(B)/test_pe $(B)/test_loader $(B)/test_abi $(B)/test_runtime $(B)/test_m4ns fixtures
 	$(B)/test_kb
 	TWEAKWIN_KB_LIMITS=m4 $(B)/test_kb
 	$(B)/test_nt
@@ -102,12 +106,15 @@ unit: $(B)/test_kb kbcheck $(B)/test_nt $(B)/test_rt $(B)/test_seh $(B)/test_pe 
 	$(B)/test_loader $(B)/fixtures
 	$(B)/test_abi
 	$(B)/test_runtime $(B)/fixtures
+	$(B)/test_m4ns
 
 integration: $(B)/tweakwin $(B)/tweakwin-asan fixtures
 	$(PYTHON) tests/integration/test_cli.py $(B)/tweakwin-asan $(B)/fixtures
 	$(PYTHON) tests/integration/test_cli.py $(B)/tweakwin $(B)/fixtures
 	$(PYTHON) tests/integration/test_m3.py $(B)/tweakwin-asan $(B)/fixtures
 	$(PYTHON) tests/integration/test_m3.py $(B)/tweakwin $(B)/fixtures
+	$(PYTHON) tests/integration/test_m4.py $(B)/tweakwin-asan $(B)/fixtures
+	$(PYTHON) tests/integration/test_m4.py $(B)/tweakwin $(B)/fixtures
 
 sweep: $(B)/sweep fixtures
 	$(B)/sweep $(B)/fixtures/hello.exe $(B)/fixtures/tweaktest.dll

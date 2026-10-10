@@ -9,6 +9,7 @@
 uint64_t tw_rt_current_teb(void);
 void tw_rt_set_current_teb(uint64_t);
 uint64_t tw_rt_build_teb(uint64_t stack_base, uint64_t stack_limit, uint64_t tid);
+void tw_modules_thread_notify(uint32_t reason);
 
 #define DLL_THREAD_ATTACH 2
 #define DLL_THREAD_DETACH 3
@@ -31,11 +32,13 @@ __attribute__((noreturn)) static void thread_tramp(uint64_t descr)
     tw_rt_set_current_teb(d.teb);
     tw_rt_tls_thread_attach(d.teb);
     tw_rt_tls_run_callbacks(DLL_THREAD_ATTACH);
+    tw_modules_thread_notify(DLL_THREAD_ATTACH);
 
     uint32_t(__attribute__((ms_abi)) * start)(void *);
     memcpy(&start, &d.start, sizeof start);
     uint32_t ret = start((void *)(uintptr_t)d.param);
 
+    tw_modules_thread_notify(DLL_THREAD_DETACH);
     tw_rt_tls_run_callbacks(DLL_THREAD_DETACH);
     tw_rt_tls_thread_detach(d.teb);
     /* The stack we are running on (d.stack_base) and the TEB are freed at

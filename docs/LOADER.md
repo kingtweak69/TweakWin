@@ -49,12 +49,40 @@ Registered namespaces:
 
 - `kernel32.dll` — ordinals 1–3 are `GetStdHandle`, `WriteFile`, `ExitProcess`. Further exports are the M2 console runtime; the list and the ordinals are in [RUNTIME.md](RUNTIME.md)
 - `ntdll.dll` — namespace only (no exports)
+- `advapi32.dll` — the M4 registry subset (see [RUNTIME.md](RUNTIME.md))
+- Any other name is looked up as a DLL file via the M4 loader
 
 DLL names are matched case-insensitively. Function names are
 case-sensitive. Those ordinals belong to the TweakWin-owned module, not
 to any particular Windows `kernel32` build. Name imports are the M1
 contract. Delay-load descriptors are not patched (Windows does that at
 first use).
+
+## Dynamic DLL loading (M4)
+
+`runtime/modules.c` is a real module registry. `LoadLibrary*` resolves a name
+through the Windows namespace (`runtime/winfs.c`: application directory =
+the namespace root, then the current directory, then configured search
+paths), maps the DLL through the same `loader/load.c` path as the EXE
+(`tw_load_dll`: the same hardened parser, relocations, IAT binding and W^X
+protection; no stack), recursively loads its imports, then runs
+`DllMain(DLL_PROCESS_ATTACH)` dependencies-first. A failed attach, missing
+dependency, or unresolved import rolls the whole batch back (detach for what
+attached, unmap everything) and sets `ERROR_DLL_INIT_FAILED` /
+`ERROR_MOD_NOT_FOUND` / `ERROR_PROC_NOT_FOUND`. Malformed or non-DLL images
+give `ERROR_BAD_EXE_FORMAT`. DLLs with implicit `.tls` are rejected, as are
+DLLs whose section file data overlaps the headers or another section.
+
+Reference counts: a module's importers each hold one reference on it; the EXE
+owns its imports. `FreeLibrary` at zero calls `DLL_PROCESS_DETACH`, releases
+its dependencies and unmaps. At `ExitProcess` the remaining DLLs get
+`DLL_PROCESS_DETACH` (non-NULL reserved) in reverse attach order. Implicitly
+imported DLLs are attached on the guest stack just before the EXE entry point.
+Forwarders are resolved with a depth limit (cycles and malformed targets fail
+with `ERROR_PROC_NOT_FOUND`).
+
+Known limits: reference cycles between DLLs leak until exit; a module whose
+refcount drops to zero while its own `DllMain` runs is reaped at exit.
 
 ## Stack
 

@@ -1,0 +1,3 @@
+LIBRARY m4_fail.dll
+EXPORTS
+    fail_fn

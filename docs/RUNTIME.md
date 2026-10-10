@@ -212,9 +212,35 @@ Invalid sequences fail with `ERROR_NO_UNICODE_TRANSLATION`. There is no
 default-character substitution, and `WideCharToMultiByte` rejects a non-NULL
 default-character pointer.
 
+## M4: Windows namespace and registry
+
+**Namespace** (`runtime/winfs.c`). The guest sees one drive, `C:`, rooted at
+`$TWEAKWIN_FS_ROOT` or, by default, the directory containing the EXE. Paths are
+normalised lexically (`/` and `\` accepted, `.` and `..` resolved, `..` clamped at
+the root, UNC / `\\?\` / other drives / invalid characters rejected) and then
+walked component by component with `O_NOFOLLOW`; a symlink anywhere is refused
+(`ERROR_ACCESS_DENIED`), never followed. Matching is case-insensitive; an
+exact-case match wins, an ambiguous match is refused. The current directory is
+virtual. Exposed through `GetFileAttributesA/W`, `FindFirstFileA/W`,
+`FindNextFileA/W`, `FindClose`, `Get/SetCurrentDirectoryA` and DLL search.
+`CreateFile` keeps the M2 relative-path policy. Residual risk: the final path
+component is handed to the host as a path string after the check, so a racing
+host process that swaps a checked component for a symlink is not defended
+against (intermediate directories are opened with `openat`).
+
+**Registry** (`runtime/registry.c`, `advapi32/`). Isolated, in-memory,
+non-persistent HKCU and HKLM trees. Never reads or writes any host registry.
+Names are case-insensitive; limits: 1024 subkeys, 1024 values per key, depth 64,
+1 MiB per value. `REG_DWORD` needs exactly 4 bytes, `REG_QWORD` 8; string
+types are stored as UTF-16 so the A and W entry points agree. Errors:
+`ERROR_FILE_NOT_FOUND` (missing key/value), `ERROR_MORE_DATA` (small buffer,
+required size returned), `ERROR_INVALID_HANDLE` (closed key, unsupported root),
+`ERROR_INVALID_PARAMETER` (bad reserved/options/type size). Anything not listed
+(RegEnum*, RegDeleteKey, RegGetValue, persistence) is simply not exported, so
+importing it fails at load.
+
 ## Still not implemented
 
-Threads, fibers, TLS callbacks actually running, SEH, the loader lock,
-`LoadLibrary`, delay-load binding, console modes, overlapped and async I/O,
-pipes, a Windows path namespace, the registry, GUI, COM, and every kernel32
-export not in the table above. `ntdll` has no exports on purpose.
+Fibers, TLS callbacks in DLLs, frame-based SEH, delay-load binding, console
+modes, overlapped and async I/O, pipes, namespace-aware `CreateFile`, registry
+persistence, GUI, COM, and every kernel32 export not in the table above. `ntdll` has no exports on purpose.

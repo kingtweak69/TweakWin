@@ -28,6 +28,22 @@ subset or is reported as unsupported rather than faked.
 | completion queues | COMPLETION_QUEUE | `CreateIoCompletionPort`, `GetQueuedCompletionStatus` | not implemented | ⚠️ | a completion object type + its waits |
 | XSAVE/AVX | XSAVE | AVX in guests; full `CONTEXT` xstate | M4 gives x87+SSE per thread; AVX faults `#UD`; the translated CONTEXT carries integer+control only | ⚠️ | wider context save; set the cap so AVX executes |
 
+## M4 loader/namespace/registry (TweakWin M4)
+
+TweakWin's dynamic DLL loader, Windows namespace and virtual registry add no
+new `kb.h` requirements, but:
+
+- **Not verified on TweakKernel.** Everything below runs on the Linux host
+  backend only. `make m4` was not run (no TweakKernel tree / QEMU in the
+  environment), so none of it is claimed on TweakKernel.
+- The image mapper (`loader/load.c`) still uses host `mmap`/`mprotect`, as for
+  the main EXE, so DLL loading additionally depends on IMAGE_SECTIONS-class
+  functionality (or an equivalent VM path) on a freestanding backend.
+- The namespace (`runtime/winfs.c`) uses POSIX `openat`/`O_NOFOLLOW`/`getdents`
+  style host file services and is therefore a host-only, file-capability-gated
+  feature until the kernel gains a filesystem with symlink-free lookup.
+- The registry is pure in-memory C and has no kernel requirement.
+
 ## Things M4 already gives TweakWin
 
 First-class processes and threads; per-thread FS/GS; x87/SSE context

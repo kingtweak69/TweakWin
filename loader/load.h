@@ -72,12 +72,24 @@ typedef struct tw_loaded {
     const void *host_stack_bottom;
     size_t host_stack_size;
 
+    int is_dll;         /* mapped by tw_load_dll: no stack, no ExitProcess */
+    void *mod_owner;    /* modules.c record that owns this image (DLLs) */
+
     tw_load_status status;
     char err[256];
 } tw_loaded;
 
 tw_load_status tw_load(const char *path, int base_policy, tw_loaded *out, tw_pe_error *perr);
 void tw_unload(tw_loaded *im);
+
+/*
+ * Map a PE32+ DLL through the same parser/mapper as tw_load: sections,
+ * relocations, imports (resolved through the module registry, which loads
+ * dependencies), then W^X protections. No stack is created and the entry
+ * point is not run; modules.c owns the DllMain lifecycle.
+ */
+tw_load_status tw_load_dll(const char *path, int base_policy, tw_loaded *out, tw_pe_error *perr);
+void tw_unload_dll(tw_loaded *im);
 
 /* Jump to AddressOfEntryPoint. On TW_LOAD_OK, *guest_exit is ExitProcess's code. */
 tw_load_status tw_execute(tw_loaded *im, uint32_t *guest_exit);

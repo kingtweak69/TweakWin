@@ -1,5 +1,7 @@
 #include "k32priv.h"
 
+#include "../runtime/modules.h"
+
 #include <errno.h>
 #include <sched.h>
 #include <string.h>
@@ -40,6 +42,8 @@ static const char *module_path(void *h)
     if (!h || (im && hv == im->base)) return tw_runtime_exe();
     if (hv == tw_runtime_k32_base()) return "C:\\TweakWin\\kernel32.dll";
     if (hv == tw_runtime_ntdll_base()) return "C:\\TweakWin\\ntdll.dll";
+    static _Thread_local char dllpath[4096];
+    if (tw_dll_path(hv, dllpath, sizeof dllpath) == 0) return dllpath;
     return NULL;
 }
 
@@ -77,6 +81,8 @@ static void *module_lookup(const char *name)
     const char *exe = tw_runtime_exe();
     if (exe && (ieq_ascii(name, exe) || ieq_ascii(name, basename_of(exe))))
         return im ? (void *)(uintptr_t)im->base : NULL;
+    uint64_t dh = tw_dll_module_handle(name);
+    if (dh) return (void *)(uintptr_t)dh;
     tw_set_last_error(TW_ERROR_MOD_NOT_FOUND);
     return NULL;
 }
