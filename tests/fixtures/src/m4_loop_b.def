@@ -1,0 +1,3 @@
+LIBRARY m4_loop_b.dll
+EXPORTS
+    b_f = m4_loop_a.a_f

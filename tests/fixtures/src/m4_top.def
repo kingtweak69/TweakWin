@@ -1,0 +1,3 @@
+LIBRARY m4_top.dll
+EXPORTS
+    top_calc

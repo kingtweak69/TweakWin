@@ -1,0 +1,4 @@
+LIBRARY m4_base.dll
+EXPORTS
+    m4_add
+    m4_mul @11 NONAME

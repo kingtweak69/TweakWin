@@ -1,0 +1,4 @@
+LIBRARY m4_dupa.dll
+EXPORTS
+    dup_id
+    dup_base

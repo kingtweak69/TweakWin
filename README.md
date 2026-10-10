@@ -111,6 +111,20 @@ import fails at load time. It is not bound to a stub that returns success.
 The exact contract, including what is refused, is
 [docs/RUNTIME.md](docs/RUNTIME.md).
 
+## What M4 adds
+
+- A dynamic DLL loader: `LoadLibraryA/W/ExA/ExW`, `GetProcAddress`,
+  `FreeLibrary`, `GetModuleHandleA/W`, dependency chains, forwarders,
+  relocation, `DllMain` lifecycle with rollback ([docs/LOADER.md](docs/LOADER.md)).
+- A contained Windows namespace (`C:\`, case-insensitive, symlink-safe) with
+  attributes, enumeration and DLL search, and an isolated in-memory registry
+  ([docs/RUNTIME.md](docs/RUNTIME.md)).
+- Fixtures are real clang/lld-link PE binaries (`tools/build-pe.sh`; the script
+  finds `/usr/lib/llvm-*/bin` if the LLVM tools are not on `PATH`).
+
+Host backend only: nothing M4 is claimed on TweakKernel
+([docs/KERNEL-REQUIREMENTS.md](docs/KERNEL-REQUIREMENTS.md)).
+
 ## Layout
 
 ```
@@ -121,7 +135,8 @@ cli/              tweakwin command (inspect, doctor, run)
 common/           arena allocator, debug categories
 loader/pe/        PE/COFF parser (M0)
 loader/load.c     PE32+ mapper, DIR64 relocs, IAT patch, guest entry
-runtime/          M2 process state, handles, guest memory, module registry
+runtime/          M2 process state, handles, guest memory, M4 module loader, winfs, registry
+advapi32/         M4 registry exports
 kernel32/         kernel32 exports (M1 console, M2 surface, M3 sync/thread/TLS/SEH)
 include/tweakwin/ version
 tests/unit/       C unit tests (ASan + UBSan)

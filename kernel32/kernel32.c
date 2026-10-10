@@ -1,6 +1,7 @@
 #include "k32priv.h"
 
 #include "../rt/object.h"
+#include "../runtime/modules.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -161,6 +162,7 @@ void TW_MS_ABI tw_k32_ExitProcess(TW_UINT uExitCode)
     struct tw_loaded *proc = tw_current_process();
     TW_DEBUG(TW_DBG_LOADER, "ExitProcess(%u)", uExitCode);
     if (!proc) _exit((int)(uExitCode & 0xff));
+    tw_modules_process_detach();
     proc->guest_exit = uExitCode;
     proc->did_exit = 1;
     proc->status = TW_LOAD_OK;
@@ -276,6 +278,21 @@ static const tw_k32_desc k_exports[] = {
     { "AddVectoredExceptionHandler", 66, (tw_k32_fn)tw_k32_AddVectoredExceptionHandler },
     { "RemoveVectoredExceptionHandler", 67, (tw_k32_fn)tw_k32_RemoveVectoredExceptionHandler },
     { "SetUnhandledExceptionFilter", 68, (tw_k32_fn)tw_k32_SetUnhandledExceptionFilter },
+    { "LoadLibraryA", 69, (tw_k32_fn)tw_k32_LoadLibraryA },
+    { "LoadLibraryW", 70, (tw_k32_fn)tw_k32_LoadLibraryW },
+    { "LoadLibraryExA", 71, (tw_k32_fn)tw_k32_LoadLibraryExA },
+    { "LoadLibraryExW", 72, (tw_k32_fn)tw_k32_LoadLibraryExW },
+    { "GetProcAddress", 73, (tw_k32_fn)tw_k32_GetProcAddress },
+    { "FreeLibrary", 74, (tw_k32_fn)tw_k32_FreeLibrary },
+    { "GetFileAttributesA", 75, (tw_k32_fn)tw_k32_GetFileAttributesA },
+    { "GetFileAttributesW", 76, (tw_k32_fn)tw_k32_GetFileAttributesW },
+    { "FindFirstFileA", 77, (tw_k32_fn)tw_k32_FindFirstFileA },
+    { "FindFirstFileW", 78, (tw_k32_fn)tw_k32_FindFirstFileW },
+    { "FindNextFileA", 79, (tw_k32_fn)tw_k32_FindNextFileA },
+    { "FindNextFileW", 80, (tw_k32_fn)tw_k32_FindNextFileW },
+    { "FindClose", 81, (tw_k32_fn)tw_k32_FindClose },
+    { "GetCurrentDirectoryA", 82, (tw_k32_fn)tw_k32_GetCurrentDirectoryA },
+    { "SetCurrentDirectoryA", 83, (tw_k32_fn)tw_k32_SetCurrentDirectoryA },
 };
 
 const tw_k32_desc *tw_k32_exports(size_t *n)

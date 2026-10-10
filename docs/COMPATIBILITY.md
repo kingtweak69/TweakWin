@@ -39,15 +39,30 @@ test exercises it.
 | Per-thread LastError (TEB) | IMPLEMENTED | `test_rt` |
 | SEH: vectored handlers + unhandled filter | IMPLEMENTED | `exc-m3`, `test_seh` |
 | SEH: exception translation (AV/#UD/#DE/#BP/FP) | IMPLEMENTED | `exc-m3`, backend conformance |
-| SEH: frame-based __try/__except (unwinding) | UNSUPPORTED | see `EXCEPTIONS.md` |
+| SEH: frame-based __try/__except (unwinding) | UNSUPPORTED | `.pdata`/`.xdata` unwinding was investigated but not implemented; see `EXCEPTIONS.md` |
 | SuspendThread/ResumeThread | STUB | `ERROR_CALL_NOT_IMPLEMENTED` (M5) |
 | Get/SetThreadContext | STUB | `ERROR_CALL_NOT_IMPLEMENTED` (M5) |
 | Mutexes | UNSUPPORTED | M5 |
 | Named objects / Open* | UNSUPPORTED | `ERROR_NOT_SUPPORTED` (M5) |
-| DLL loader (LoadLibrary/GetProcAddress) | UNSUPPORTED | internal module registry only |
+| LoadLibraryA/W, LoadLibraryExA/W (flags 0, `LOAD_WITH_ALTERED_SEARCH_PATH`) | IMPLEMENTED | `m4-main`, `m4-dyn`, `test_m4.py` |
+| LoadLibraryEx other flags | PARTIAL | known flags fail `ERROR_NOT_SUPPORTED`, unknown bits `ERROR_INVALID_PARAMETER` |
+| GetProcAddress (name, ordinal) / GetModuleHandleA/W / FreeLibrary | IMPLEMENTED | `m4-main`, `m4-dyn` (GetProcAddress on the EXE's own handle is not supported) |
+| DLL dependency chains, import binding across modules (name + ordinal) | IMPLEMENTED | `m4-impl`, `m4-dyn` (`m4_top`→`m4_mid`→`m4_base`) |
+| Export forwarders (`DLL.Func`, `DLL.#N`), cycle + malformed detection | IMPLEMENTED | `m4-dyn` (`m4_mid`, `m4_loop_a/b`, patched malformed forwarder) |
+| DLL relocation / base conflicts | IMPLEMENTED | `m4-dyn` (`m4_dupa`/`m4_dupb` share a base) |
+| DllMain PROCESS_ATTACH/DETACH ordering, refcounts, rollback | IMPLEMENTED | `m4-impl`, `m4-dyn`, `test_m4.py` |
+| DllMain THREAD_ATTACH/DETACH | PARTIAL | delivered for threads created via `CreateThread`; `DisableThreadLibraryCalls` is not implemented |
+| DLL implicit TLS (`.tls`) | UNSUPPORTED | rejected at load (`ERROR_BAD_EXE_FORMAT`); the M3 TLS model is single-image. Dynamic TLS (`TlsAlloc`) from a DLL works (`m4-dyn`) |
+| Loader lock | PARTIAL | one recursive process-wide lock serialises load/free/attach/detach; no Win32 `LdrLockLoaderLock` surface |
+| Circular DLL dependencies (A↔B) | PARTIAL | load works, but the cycle's modules are only reclaimed at process exit |
+| Windows namespace: `C:\`, `..`, cwd, case-insensitive match, confinement | PARTIAL | `m4-fs`, `test_m4ns`; one drive; used by LoadLibrary and the new attribute/enumeration APIs only |
+| GetFileAttributesA/W, FindFirst/NextFileA/W, FindClose, Get/SetCurrentDirectoryA | PARTIAL | `m4-fs`; no `*Ex`, no info levels, no `SetCurrentDirectoryW`/`GetCurrentDirectoryW` |
+| Symlink + host-escape protection | IMPLEMENTED | `m4-fs`, `test_m4ns` (symlinks refused, never followed; ambiguous case collisions refused) |
+| CreateFile through the namespace | UNSUPPORTED | CreateFile keeps the M2 relative-path policy (unchanged) |
+| Registry: RegOpenKeyExA/W, RegCreateKeyExA/W, RegQueryValueExA/W, RegSetValueExA/W, RegCloseKey, RegDeleteValueA/W | PARTIAL | `m4-reg`, `test_m4ns`; in-memory HKCU/HKLM only, never touches the host |
+| Registry persistence, enumeration, RegDeleteKey, other predefined roots | UNSUPPORTED | imports fail at load; other roots return `ERROR_INVALID_HANDLE` |
+| DLL search: exe dir, cwd, configured paths | PARTIAL | `test_m4ns`; no PATH, no system directories, no SxS/manifests, no API sets |
 | CreateProcess | UNSUPPORTED | backend `process_spawn` exists; no Win32 wrapper yet |
-| Registry | UNSUPPORTED | next milestone |
-| Windows path/VFS (drives, `..`, `C:\`) | UNSUPPORTED | M2 relative-path policy only |
 | USER32 / GDI / COM / DirectX / .NET | UNSUPPORTED | out of scope for this milestone |
 
 ## Backend portability
@@ -58,3 +73,9 @@ threads, TLS base, events, semaphores, wait-one/any, sections, exceptions,
 handles/rights) is additionally verified on real TweakKernel v0.5.0-m4 under
 QEMU (`make m4`). Host-only services (file/console/spawn) are
 capability-gated and are not claimed on M4.
+
+The M4 (milestone) dynamic loader, namespace and registry are host-backend
+features. They use only existing `kb.h` services (VM, threads, TLS) but have
+**not** been executed on TweakKernel: `make m4` needs the TweakKernel tree and
+QEMU, which were unavailable when this work was done, so none of the new
+items is claimed on TweakKernel.

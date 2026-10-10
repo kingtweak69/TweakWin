@@ -40,6 +40,13 @@ typedef uint64_t TW_SIZE_T;
 #define TW_ERROR_FILE_NOT_FOUND          2u
 #define TW_ERROR_PATH_NOT_FOUND          3u
 #define TW_ERROR_ACCESS_DENIED           5u
+#define TW_ERROR_NO_MORE_FILES           18u
+#define TW_ERROR_PROC_NOT_FOUND          127u
+#define TW_ERROR_BAD_EXE_FORMAT          193u
+#define TW_ERROR_MORE_DATA               234u
+#define TW_ERROR_BAD_PATHNAME            161u
+#define TW_ERROR_DIRECTORY               267u
+#define TW_ERROR_DLL_INIT_FAILED         1114u
 #define TW_ERROR_INVALID_HANDLE          6u
 #define TW_ERROR_NOT_ENOUGH_MEMORY       8u
 #define TW_ERROR_WRITE_FAULT             29u

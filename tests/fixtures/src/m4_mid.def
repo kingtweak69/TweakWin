@@ -1,0 +1,4 @@
+LIBRARY m4_mid.dll
+EXPORTS
+    mid_calc
+    mid_fwd_add = m4_base.m4_add

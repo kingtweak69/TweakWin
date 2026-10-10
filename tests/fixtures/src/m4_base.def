@@ -1,0 +1,10 @@
+LIBRARY m4_base.dll
+EXPORTS
+    m4_add
+    m4_mul @11
+    m4_next
+    m4_pick
+    m4_tls_set
+    m4_tls_get
+    m4_thread_events
+    m4_name_ptr

@@ -1,0 +1,3 @@
+LIBRARY m4_missing.dll
+EXPORTS
+    imp_fn

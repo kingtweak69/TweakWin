@@ -111,6 +111,22 @@ TW_BOOL TW_MS_ABI tw_k32_TlsFree(TW_DWORD index);
 void *TW_MS_ABI tw_k32_TlsGetValue(TW_DWORD index);
 TW_BOOL TW_MS_ABI tw_k32_TlsSetValue(TW_DWORD index, void *value);
 
+/* ---- M4: dynamic modules, Windows filesystem namespace ---- */
+void *TW_MS_ABI tw_k32_LoadLibraryA(const char *lpLibFileName);
+void *TW_MS_ABI tw_k32_LoadLibraryW(const uint16_t *lpLibFileName);
+void *TW_MS_ABI tw_k32_LoadLibraryExA(const char *lpLibFileName, TW_HANDLE hFile, TW_DWORD dwFlags);
+void *TW_MS_ABI tw_k32_LoadLibraryExW(const uint16_t *lpLibFileName, TW_HANDLE hFile, TW_DWORD dwFlags);
+void *TW_MS_ABI tw_k32_GetProcAddress(void *hModule, const char *lpProcName);
+TW_BOOL TW_MS_ABI tw_k32_FreeLibrary(void *hModule);
+TW_DWORD TW_MS_ABI tw_k32_GetFileAttributesA(const char *lpFileName);
+TW_DWORD TW_MS_ABI tw_k32_GetFileAttributesW(const uint16_t *lpFileName);
+TW_HANDLE TW_MS_ABI tw_k32_FindFirstFileA(const char *lpFileName, void *lpFindFileData);
+TW_HANDLE TW_MS_ABI tw_k32_FindFirstFileW(const uint16_t *lpFileName, void *lpFindFileData);
+TW_BOOL TW_MS_ABI tw_k32_FindNextFileA(TW_HANDLE hFindFile, void *lpFindFileData);
+TW_BOOL TW_MS_ABI tw_k32_FindNextFileW(TW_HANDLE hFindFile, void *lpFindFileData);
+TW_BOOL TW_MS_ABI tw_k32_FindClose(TW_HANDLE hFindFile);
+TW_DWORD TW_MS_ABI tw_k32_GetCurrentDirectoryA(TW_DWORD nBufferLength, char *lpBuffer);
+TW_BOOL TW_MS_ABI tw_k32_SetCurrentDirectoryA(const char *lpPathName);
 
 /* ---- exception handling ---- */
 void *TW_MS_ABI tw_k32_AddVectoredExceptionHandler(TW_DWORD first, void *handler);

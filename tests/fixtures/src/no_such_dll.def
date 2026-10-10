@@ -1,0 +1,3 @@
+LIBRARY no_such_dll.dll
+EXPORTS
+    nothing
